@@ -1,0 +1,300 @@
+{
+  "name": "WhatsApp AI Customer Support Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.messages[0].text.body }}",
+        "options": {
+          "systemMessage": "You are a professional, friendly, and knowledgeable customer support assistant for our business on WhatsApp. Your responsibilities:\n\n1. Always greet customers politely and maintain a professional, helpful tone throughout the conversation.\n2. If a customer asks about products, prices, availability, or stock, use the 'Get Inventory' tool to search the Inventory sheet and provide accurate, up-to-date information.\n3. If a customer asks a general question (shipping, returns, payment methods, store hours, policies, etc.), use the 'Get FAQ' tool to search the FAQ sheet and answer using that information.\n4. If a customer wants to place an order, confirm the product name, quantity, price, and delivery details with the customer first, then use the 'Post Orders' tool to append the order details to the Orders sheet. Always confirm back to the customer once the order has been recorded.\n5. Use the conversation memory to remember context from earlier in the chat (e.g., previously mentioned products or order details) so you don't ask the customer to repeat themselves.\n6. If you are unsure about something or the tools do not return relevant information, politely let the customer know you will escalate to a human agent rather than guessing.\n7. Keep responses concise, clear, and formatted appropriately for WhatsApp (short paragraphs, no unnecessary jargon).\n\nAlways decide automatically which tool(s) to use based on the customer's intent before responding."
+        }
+      },
+      "id": "e489e5dc-2276-4238-a668-2fdaf00eec6c",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        -160,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}",
+        "contextWindowLength": 10
+      },
+      "id": "7c6f2b93-2e5e-4b64-9c76-b0f93717eeca",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search the FAQ Google Sheet to answer general customer questions about shipping, returns, payment methods, store hours, and policies. Input should be the customer's question or keyword to search for.",
+        "operation": "search",
+        "documentId": {
+          "__rl": true,
+          "value": "1xuDqZrRUSxl_1K6HBwD_8-oVBhUFph3X4J5TveMSEck",
+          "mode": "id"
+        }
+      },
+      "id": "e3055baf-e0de-4ff5-acfa-f936aedb93b2",
+      "name": "Google Sheets - Get FAQ",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        -16,
+        144
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search the Inventory Google Sheet to check product availability, stock levels, and prices. Input should be the product name or keyword the customer is asking about.",
+        "operation": "search",
+        "documentId": {
+          "__rl": true,
+          "value": "1xuDqZrRUSxl_1K6HBwD_8-oVBhUFph3X4J5TveMSEck",
+          "mode": "id"
+        }
+      },
+      "id": "d9e0024d-e3db-4152-9402-d2db9a1a4796",
+      "name": "Google Sheets - Get Inventory",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        256,
+        144
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Append a new customer order to the Orders Google Sheet. Use this when a customer confirms they want to place an order. Provide the customer phone number, product name, quantity, price, and order date.",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1xuDqZrRUSxl_1K6HBwD_8-oVBhUFph3X4J5TveMSEck",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CustomerPhone": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}",
+            "Product": "={{ $fromAI('product', 'Name of the product ordered', 'string') }}",
+            "Quantity": "={{ $fromAI('quantity', 'Quantity of the product ordered', 'number') }}",
+            "Price": "={{ $fromAI('price', 'Price of the product', 'string') }}",
+            "OrderDate": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "id": "f59631e6-972a-46cd-8901-97bc3ffe9738",
+      "name": "Google Sheets - Post Orders",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "YOUR_PHONE_NUMBER_ID",
+        "recipientPhoneNumber": "=03322762714",
+        "textBody": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "id": "d458c3ca-320f-4c0a-a7e3-f297c1a3c464",
+      "name": "WhatsApp Send Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        384,
+        -160
+      ],
+      "webhookId": "e0ad0491-cd06-4bb2-bd09-64feef2010aa",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "YOUR_WHATSAPP_CREDENTIAL_ID",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "llama-3.3-70b-versatile",
+          "mode": "list",
+          "cachedResultName": "llama-3.3-70b-versatile"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -384,
+        128
+      ],
+      "id": "fc3d27b1-a08f-4725-ab52-dc608c1b733b",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "id": "1f7a058b-b308-4d23-a822-80c79c4c2e79",
+      "name": "WhatsApp Trigger",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        -144
+      ],
+      "webhookId": "wa-trigger-webhook-001",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "YOUR_WHATSAPP_TRIGGER_CREDENTIAL_ID",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Send Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Get FAQ": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Get Inventory": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Post Orders": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d1b38b4b-cd36-4c37-84bc-c2fb4c5315b1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "YOUR_INSTANCE_ID"
+  },
+  "nodeGroups": [],
+  "id": "pJDOWTUBLD6kkQQU",
+  "tags": []
+}
